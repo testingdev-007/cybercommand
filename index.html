@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Command Centre</title>
+    <title>3D Cyber Command Centre</title>
     <style>
         :root {
             --primary: #00ff66;
             --alert: #ff3333;
-            --bg-dark: #0a0a12;
-            --panel-bg: rgba(10, 10, 18, 0.85);
+            --bg-dark: #05050a;
+            --panel-bg: rgba(5, 5, 10, 0.85);
         }
 
         body, html {
@@ -23,8 +23,8 @@
             color: var(--primary);
         }
 
-        /* Cyber Map Canvas */
-        #mapCanvas {
+        /* 3D WebGL Canvas */
+        #globeContainer {
             position: absolute;
             top: 0;
             left: 0;
@@ -33,22 +33,22 @@
             z-index: 1;
         }
 
-        /* Threat Log Panel */
+        /* UI Overlays */
         #threatLog {
             position: absolute;
             bottom: 20px;
             left: 20px;
-            width: 350px;
+            width: 360px;
             height: 180px;
             background: var(--panel-bg);
-            border: 1px solid rgba(0, 255, 102, 0.3);
+            border: 1px solid rgba(0, 255, 102, 0.2);
             border-radius: 4px;
-            padding: 10px;
+            padding: 12px;
             font-size: 11px;
             overflow-y: hidden;
             pointer-events: none;
             z-index: 2;
-            box-shadow: 0 0 15px rgba(0, 255, 102, 0.1);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.05);
         }
 
         .log-entry {
@@ -60,7 +60,6 @@
         .log-entry.malware { color: #ff3333; }
         .log-entry.phishing { color: #00ccff; }
 
-        /* Control Panel */
         #controlPanel {
             position: absolute;
             top: 20px;
@@ -72,7 +71,7 @@
             background: var(--panel-bg);
             padding: 15px 25px;
             border-radius: 8px;
-            border: 1px solid rgba(0, 255, 102, 0.2);
+            border: 1px solid rgba(0, 255, 102, 0.15);
         }
 
         .btn {
@@ -87,7 +86,6 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             transition: all 0.3s ease;
-            box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
         }
 
         .btn:hover {
@@ -99,7 +97,6 @@
         #btnFinish {
             color: var(--alert);
             border-color: var(--alert);
-            box-shadow: 0 0 10px rgba(255, 51, 51, 0.2);
         }
 
         #btnFinish:hover {
@@ -108,15 +105,15 @@
             box-shadow: 0 0 20px var(--alert);
         }
 
-        /* Video Overlay Container */
+        /* Video System */
         #videoContainer {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 5;
-            background: rgba(0,0,0,0.8);
+            z-index: 20;
+            background: rgba(0,0,0,0.85);
             display: none;
             justify-content: center;
             align-items: center;
@@ -125,8 +122,8 @@
         video {
             max-width: 90%;
             max-height: 85%;
-            border: 2px solid rgba(0, 255, 102, 0.5);
-            box-shadow: 0 0 30px rgba(0, 255, 102, 0.3);
+            border: 2px solid rgba(0, 255, 102, 0.4);
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.2);
             background: #000;
         }
 
@@ -138,8 +135,7 @@
 </head>
 <body>
 
-    <canvas id="mapCanvas"></canvas>
-
+    <div id="globeContainer"></div>
     <div id="threatLog"></div>
 
     <div id="controlPanel">
@@ -151,23 +147,245 @@
         <video id="mainPlayer" controls></video>
     </div>
 
+    <script src="three.min.js"></script>
+
     <script>
         // ==========================================
-        // CONFIGURATION: EDIT YOUR VIDEO SEQUENCING HERE
+        // VIDEO CONFIGURATION
         // ==========================================
         const VIDEO_CONFIG = {
-            // "Start" button plays these in exact order
             startSequence: [
                 "media/start1.mp4",
-                "media/start2.mp4",
-                "media/start3.mp4"
+                "media/start2.mp4"
             ],
-            // "Finish" button plays this single video
             finishVideo: "media/finish.mp4"
         };
 
         // ==========================================
-        // VIDEO PLAYER LOGIC
+        // 3D GLOBE ENGINE (Three.js)
+        // ==========================================
+        const container = document.getElementById('globeContainer');
+        let scene, camera, renderer, globeGroup;
+        let arcs = [];
+
+        // Geolocation coordinates for recognizable cities
+        const cities = [
+            { name: "London", lat: 51.5074, lon: -0.1278 },
+            { name: "New York", lat: 40.7128, lon: -74.0060 },
+            { name: "Tokyo", lat: 35.6762, lon: 139.6503 },
+            { name: "Sydney", lat: -33.8688, lon: 151.2093 },
+            { name: "Cape Town", lat: -33.9249, lon: 18.4241 },
+            { name: "São Paulo", lat: -23.5505, lon: -46.6333 },
+            { name: "San Francisco", lat: 37.7749, lon: -122.4194 },
+            { name: "Singapore", lat: 1.3521, lon: 103.8198 },
+            { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
+            { name: "Dubai", lat: 25.2048, lon: 55.2708 }
+        ];
+
+        const attackTypes = [
+            { name: "DDoS Vector", color: 0xff9900, class: "ddos" },
+            { name: "Malware Injection", color: 0xff3333, class: "malware" },
+            { name: "Phishing Stream", color: 0x00ccff, class: "phishing" }
+        ];
+
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 220;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            globeGroup = new THREE.Group();
+            scene.add(globeGroup);
+
+            // 1. Generate a recognizable world map via matrix dots
+            createProceduralWorld();
+
+            // 2. Add glowing rings/labels for cities
+            createCityMarkers();
+
+            // Tilt the globe slightly for a better command center layout view
+            globeGroup.rotation.x = 0.3;
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        // Converts Lat/Lon coordinates into a 3D Vector position on our sphere
+        function latLonToVector3(lat, lon, radius) {
+            const phi = (90 - lat) * (Math.PI / 180);
+            const theta = (lon + 180) * (Math.PI / 180);
+
+            return new THREE.Vector3(
+                -(radius * Math.sin(phi) * Math.sin(theta)),
+                radius * Math.cos(phi),
+                radius * Math.sin(phi) * Math.cos(theta)
+            );
+        }
+
+        // Procedural generator that maps math coordinates onto a sphere to mimic continents
+        function createProceduralWorld() {
+            const radius = 60;
+            const dotCount = 8000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+
+            // Simple mathematical function to approximate visible landmasses 
+            function isLand(lat, lon) {
+                // Rough checks to sketch Americas, Eurasia, Africa, and Australia
+                if (lat > -60 && lat < 75 && lon > -160 && lon < -35) {
+                    return !(lat > 15 && lat < 50 && lon > -100 && lon < -80); // Quick cut for Atlantic/gulf
+                }
+                if (lat > -35 && lat < 75 && lon > -20 && lon < 145) return true; 
+                if (lat > -40 && lat < -10 && lon > 110 && lon < 155) return true; 
+                return false;
+            }
+
+            for (let i = 0; i < dotCount; i++) {
+                const phi = Math.acos((Math.random() * 2) - 1);
+                const theta = Math.random() * Math.PI * 2;
+
+                const lat = 90 - (phi * 180 / Math.PI);
+                const lon = (theta * 180 / Math.PI) - 180;
+
+                if (isLand(lat, lon) || Math.random() < 0.03) { // Matrix dot density
+                    const pos = new THREE.Vector3(
+                        -(radius * Math.sin(phi) * Math.sin(theta)),
+                        radius * Math.cos(phi),
+                        radius * Math.sin(phi) * Math.cos(theta)
+                    );
+                    positions.push(pos.x, pos.y, pos.z);
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({
+                color: 0x00ff66,
+                size: 0.8,
+                transparent: true,
+                opacity: 0.35
+            });
+
+            const globeDots = new THREE.Points(geometry, material);
+            globeGroup.add(globeDots);
+
+            // Subtle wireframe base sphere underneath the dots
+            const sphereGeo = new THREE.SphereGeometry(radius - 0.5, 32, 32);
+            const sphereMat = new THREE.MeshBasicMaterial({
+                color: 0x002211,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.04
+            });
+            const baseSphere = new THREE.Mesh(sphereGeo, sphereMat);
+            globeGroup.add(baseSphere);
+        }
+
+        function createCityMarkers() {
+            cities.forEach(city => {
+                const pos = latLonToVector3(city.lat, city.lon, 60);
+                
+                const geo = new THREE.SphereGeometry(0.8, 8, 8);
+                const mat = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.copy(pos);
+                globeGroup.add(mesh);
+            });
+        }
+
+        // Generates an arched mathematical line mapping between two nodes
+        function launchAttackArc() {
+            const fromCity = cities[Math.floor(Math.random() * cities.length)];
+            let toCity = cities[Math.floor(Math.random() * cities.length)];
+            while (toCity === fromCity) { toCity = cities[Math.floor(Math.random() * cities.length)]; }
+
+            const attack = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+            const p1 = latLonToVector3(fromCity.lat, fromCity.lon, 60);
+            const p2 = latLonToVector3(toCity.lat, toCity.lon, 60);
+
+            // Calculate the 3D trajectory curve
+            const numPoints = 30;
+            const points = [];
+            for (let i = 0; i <= numPoints; i++) {
+                const t = i / numPoints;
+                const p = new THREE.Vector3().lerpVectors(p1, p2, t);
+                p.normalize();
+                
+                // Lift the arc into space based on an inverse parabola math curve
+                const height = 12 * Math.sin(t * Math.PI); 
+                p.multiplyScalar(60 + height);
+                points.push(p);
+            }
+
+            const curve = new THREE.CatmullRomCurve3(points);
+            const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(50));
+            
+            const mat = new THREE.LineBasicMaterial({
+                color: attack.color,
+                transparent: true,
+                opacity: 0.0 // Starts invisible, fades up during animation
+            });
+
+            const line = new THREE.Line(geo, mat);
+            globeGroup.add(line);
+
+            arcs.push({
+                line: line,
+                progress: 0,
+                speed: 0.02 + Math.random() * 0.01
+            });
+
+            // Update UI Threat Log
+            const logPanel = document.getElementById('threatLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${attack.class}`;
+            entry.innerHTML = `[PING] ${attack.name}: ${fromCity.name} ➔ ${toCity.name}`;
+            logPanel.appendChild(entry);
+            if (logPanel.children.length > 8) logPanel.removeChild(logPanel.firstChild);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Slowly spin the globe
+            globeGroup.rotation.y += 0.0015;
+
+            // Animate flying attack tracers
+            for (let i = arcs.length - 1; i >= 0; i--) {
+                let arc = arcs[i];
+                arc.progress += arc.speed;
+                
+                if(arc.progress <= 0.5) {
+                    arc.line.material.opacity = arc.progress * 2; // Fade in
+                } else {
+                    arc.line.material.opacity = 2 * (1 - arc.progress); // Fade out
+                }
+
+                // Slice data coordinates geometry array to visually "draw" line forwards
+                arc.line.geometry.setDrawRange(0, Math.floor(arc.progress * 50));
+
+                if (arc.progress >= 1) {
+                    globeGroup.remove(arc.line);
+                    arcs.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        setInterval(launchAttackArc, 1500);
+        window.onload = init3D;
+
+        // ==========================================
+        // SYSTEM CONTROLS & INTERRUPTS
         // ==========================================
         const videoContainer = document.getElementById('videoContainer');
         const videoPlayer = document.getElementById('mainPlayer');
@@ -180,9 +398,7 @@
         function playVideo(src) {
             videoPlayer.src = src;
             videoContainer.style.display = 'flex';
-            videoPlayer.play().catch(err => {
-                console.log("Autoplay blocked or video missing. Click play manually.", err);
-            });
+            videoPlayer.play().catch(err => console.log("System Alert: Media block handled.", err));
         }
 
         function closeVideoPlayer() {
@@ -192,7 +408,6 @@
             isPlayingSequence = false;
         }
 
-        // Start Sequence Click
         btnStart.addEventListener('click', () => {
             if (VIDEO_CONFIG.startSequence.length === 0) return;
             isPlayingSequence = true;
@@ -200,207 +415,27 @@
             playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
         });
 
-        // Finish Click
         btnFinish.addEventListener('click', () => {
-            isPlayingSequence = false; // Interrupts start sequence if active
+            isPlayingSequence = false; 
             playVideo(VIDEO_CONFIG.finishVideo);
         });
 
-        // Handle Video Ending
         videoPlayer.addEventListener('ended', () => {
             if (isPlayingSequence) {
                 currentSequenceIndex++;
                 if (currentSequenceIndex < VIDEO_CONFIG.startSequence.length) {
-                    // Play next in queue
                     playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
                 } else {
-                    // Sequence finished
                     closeVideoPlayer();
                 }
             } else {
-                // Finish video ended
                 closeVideoPlayer();
             }
         });
 
-        // Close overlay if clicking outside the video frame
         videoContainer.addEventListener('click', (e) => {
-            if (e.target === videoContainer) {
-                closeVideoPlayer();
-            }
+            if (e.target === videoContainer) closeVideoPlayer();
         });
-
-
-        // ==========================================
-        // CYBER ATTACK MAP SIMULATION (Canvas)
-        // ==========================================
-        const canvas = document.getElementById('mapCanvas');
-        const ctx = canvas.getContext('2d');
-        const logPanel = document.getElementById('threatLog');
-
-        // Major Global Coordinates (Normalized 0 to 100 for scaling)
-        const targets = [
-            { name: "London", x: 48, y: 32 },
-            { name: "New York", x: 28, y: 38 },
-            { name: "Tokyo", x: 88, y: 40 },
-            { name: "Sydney", x: 92, y: 82 },
-            { name: "Cape Town", x: 53, y: 80 },
-            { name: "São Paulo", x: 36, y: 72 },
-            { name: "Silicon Valley", x: 18, y: 40 },
-            { name: "Frankfurt", x: 51, y: 33 },
-            { name: "Singapore", x: 79, y: 58 },
-            { name: "Mumbai", x: 71, y: 50 },
-            { name: "Dubai", x: 62, y: 46 },
-            { name: "Reykjavik", x: 43, y: 22 }
-        ];
-
-        const attackTypes = [
-            { name: "DDoS Attack", class: "ddos", color: "#ff9900" },
-            { name: "Malware Injection", class: "malware", color: "#ff3333" },
-            { name: "Phishing Vector", class: "phishing", color: "#00ccff" },
-            { name: "Ransomware Payload", class: "malware", color: "#ff3333" }
-        ];
-
-        let activeAttacks = [];
-
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        // Helper to convert normalized coordinates to actual pixels
-        function getXY(target) {
-            return {
-                x: (target.x / 100) * canvas.width,
-                y: (target.y / 100) * canvas.height
-            };
-        }
-
-        // Draw a simulated digital tech-grid world map
-        function drawWorldGrid() {
-            ctx.fillStyle = '#0a0a12';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw clean cyber map background grid
-            ctx.strokeStyle = 'rgba(0, 255, 102, 0.04)';
-            ctx.lineWidth = 1;
-            const gridSize = 40;
-            for (let x = 0; x < canvas.width; x += gridSize) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-            }
-            for (let y = 0; y < canvas.height; y += gridSize) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-            }
-
-            // Draw target nodes
-            targets.forEach(target => {
-                const pos = getXY(target);
-                ctx.fillStyle = 'rgba(0, 255, 102, 0.4)';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = 'rgba(0, 255, 102, 0.15)';
-                ctx.font = '10px monospace';
-                ctx.fillText(target.name, pos.x + 8, pos.y + 3);
-            });
-        }
-
-        // Spawns a randomized simulated cyber attack
-        function triggerRandomAttack() {
-            const from = targets[Math.floor(Math.random() * targets.length)];
-            let to = targets[Math.floor(Math.random() * targets.length)];
-            while (to === from) { to = targets[Math.floor(Math.random() * targets.length)]; }
-
-            const type = attackTypes[Math.floor(Math.random() * attackTypes.length)];
-            
-            activeAttacks.push({
-                from: getXY(from),
-                to: getXY(to),
-                type: type,
-                progress: 0,
-                speed: 0.015 + Math.random() * 0.02,
-                impactRadius: 0
-            });
-
-            // Log entry creation
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type.class}`;
-            const time = new Date().toLocaleTimeString().split(' ')[0];
-            entry.innerHTML = `[${time}] ${type.name}: ${from.name} -> ${to.name}`;
-            logPanel.appendChild(entry);
-            
-            // Keep log scrolled to bottom, trim older entries
-            if(logPanel.children.length > 8) logPanel.removeChild(logPanel.firstChild);
-            logPanel.scrollTop = logPanel.scrollHeight;
-        }
-
-        // Animation Loop
-        function animate() {
-            drawWorldGrid();
-
-            for (let i = activeAttacks.length - 1; i >= 0; i--) {
-                let attack = activeAttacks[i];
-                
-                if (attack.progress < 1) {
-                    // Draw Bezier or curved beam from source to destination
-                    attack.progress += attack.speed;
-                    
-                    let currentX = attack.from.x + (attack.to.x - attack.from.x) * attack.progress;
-                    let currentY = attack.from.y + (attack.to.y - attack.from.y) * attack.progress;
-
-                    // Add a slight arc curve to the line
-                    let midX = (attack.from.x + attack.to.x) / 2;
-                    let midY = (attack.from.y + attack.to.y) / 2 - 50; // Arc apex
-                    
-                    // Quadratic Bezier interpolation point calculation
-                    let t = attack.progress;
-                    let arcX = (1 - t) * (1 - t) * attack.from.x + 2 * (1 - t) * t * midX + t * t * attack.to.x;
-                    let arcY = (1 - t) * (1 - t) * attack.from.y + 2 * (1 - t) * t * midY + t * t * attack.to.y;
-
-                    ctx.strokeStyle = attack.type.color;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(attack.from.x, attack.from.y);
-                    
-                    // Draw trail up to current progress position
-                    ctx.lineTo(arcX, arcY);
-                    ctx.stroke();
-
-                    // Lead tracer dot
-                    ctx.fillStyle = '#ffffff';
-                    ctx.beginPath();
-                    ctx.arc(arcX, arcY, 3, 0, Math.PI * 2);
-                    ctx.fill();
-                } else {
-                    // Destination Hit: Draw a fading explosion ring
-                    attack.impactRadius += 2;
-                    let alpha = 1 - (attack.impactRadius / 40);
-                    
-                    ctx.strokeStyle = attack.type.color;
-                    ctx.globalAlpha = Math.max(0, alpha);
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath();
-                    ctx.arc(attack.to.x, attack.to.y, attack.impactRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.globalAlpha = 1.0; // Reset alpha
-
-                    if (alpha <= 0) {
-                        activeAttacks.splice(i, 1); // Clear finished attack
-                    }
-                }
-            }
-
-            requestAnimationFrame(animate);
-        }
-
-        // Periodically drop simulated attacks
-        setInterval(triggerRandomAttack, 1400);
-        
-        // Fire up the animation matrix
-        animate();
     </script>
 </body>
 </html>
