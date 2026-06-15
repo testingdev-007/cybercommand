@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Command Centre</title>
+    <style>
+        :root {
+            --primary: #00ff66;
+            --alert: #ff3333;
+            --bg-dark: #0a0a12;
+            --panel-bg: rgba(10, 10, 18, 0.85);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--primary);
+        }
+
+        /* Cyber Map Canvas */
+        #mapCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Threat Log Panel */
+        #threatLog {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 350px;
+            height: 180px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 255, 102, 0.3);
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 11px;
+            overflow-y: hidden;
+            pointer-events: none;
+            z-index: 2;
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.1);
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            white-space: nowrap;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .log-entry.ddos { color: #ff9900; }
+        .log-entry.malware { color: #ff3333; }
+        .log-entry.phishing { color: #00ccff; }
+
+        /* Control Panel */
+        #controlPanel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 20px;
+            background: var(--panel-bg);
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 102, 0.2);
+        }
+
+        .btn {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 10px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: inherit;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        #btnFinish {
+            color: var(--alert);
+            border-color: var(--alert);
+            box-shadow: 0 0 10px rgba(255, 51, 51, 0.2);
+        }
+
+        #btnFinish:hover {
+            background: var(--alert);
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px var(--alert);
+        }
+
+        /* Video Overlay Container */
+        #videoContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video {
+            max-width: 90%;
+            max-height: 85%;
+            border: 2px solid rgba(0, 255, 102, 0.5);
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.3);
+            background: #000;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="mapCanvas"></canvas>
+
+    <div id="threatLog"></div>
+
+    <div id="controlPanel">
+        <button id="btnStart" class="btn">Start Mission</button>
+        <button id="btnFinish" class="btn">Finish Mission</button>
+    </div>
+
+    <div id="videoContainer">
+        <video id="mainPlayer" controls></video>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION: EDIT YOUR VIDEO SEQUENCING HERE
+        // ==========================================
+        const VIDEO_CONFIG = {
+            // "Start" button plays these in exact order
+            startSequence: [
+                "media/start1.mp4",
+                "media/start2.mp4",
+                "media/start3.mp4"
+            ],
+            // "Finish" button plays this single video
+            finishVideo: "media/finish.mp4"
+        };
+
+        // ==========================================
+        // VIDEO PLAYER LOGIC
+        // ==========================================
+        const videoContainer = document.getElementById('videoContainer');
+        const videoPlayer = document.getElementById('mainPlayer');
+        const btnStart = document.getElementById('btnStart');
+        const btnFinish = document.getElementById('btnFinish');
+        
+        let currentSequenceIndex = 0;
+        let isPlayingSequence = false;
+
+        function playVideo(src) {
+            videoPlayer.src = src;
+            videoContainer.style.display = 'flex';
+            videoPlayer.play().catch(err => {
+                console.log("Autoplay blocked or video missing. Click play manually.", err);
+            });
+        }
+
+        function closeVideoPlayer() {
+            videoContainer.style.display = 'none';
+            videoPlayer.pause();
+            videoPlayer.src = "";
+            isPlayingSequence = false;
+        }
+
+        // Start Sequence Click
+        btnStart.addEventListener('click', () => {
+            if (VIDEO_CONFIG.startSequence.length === 0) return;
+            isPlayingSequence = true;
+            currentSequenceIndex = 0;
+            playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
+        });
+
+        // Finish Click
+        btnFinish.addEventListener('click', () => {
+            isPlayingSequence = false; // Interrupts start sequence if active
+            playVideo(VIDEO_CONFIG.finishVideo);
+        });
+
+        // Handle Video Ending
+        videoPlayer.addEventListener('ended', () => {
+            if (isPlayingSequence) {
+                currentSequenceIndex++;
+                if (currentSequenceIndex < VIDEO_CONFIG.startSequence.length) {
+                    // Play next in queue
+                    playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
+                } else {
+                    // Sequence finished
+                    closeVideoPlayer();
+                }
+            } else {
+                // Finish video ended
+                closeVideoPlayer();
+            }
+        });
+
+        // Close overlay if clicking outside the video frame
+        videoContainer.addEventListener('click', (e) => {
+            if (e.target === videoContainer) {
+                closeVideoPlayer();
+            }
+        });
+
+
+        // ==========================================
+        // CYBER ATTACK MAP SIMULATION (Canvas)
+        // ==========================================
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const logPanel = document.getElementById('threatLog');
+
+        // Major Global Coordinates (Normalized 0 to 100 for scaling)
+        const targets = [
+            { name: "London", x: 48, y: 32 },
+            { name: "New York", x: 28, y: 38 },
+            { name: "Tokyo", x: 88, y: 40 },
+            { name: "Sydney", x: 92, y: 82 },
+            { name: "Cape Town", x: 53, y: 80 },
+            { name: "São Paulo", x: 36, y: 72 },
+            { name: "Silicon Valley", x: 18, y: 40 },
+            { name: "Frankfurt", x: 51, y: 33 },
+            { name: "Singapore", x: 79, y: 58 },
+            { name: "Mumbai", x: 71, y: 50 },
+            { name: "Dubai", x: 62, y: 46 },
+            { name: "Reykjavik", x: 43, y: 22 }
+        ];
+
+        const attackTypes = [
+            { name: "DDoS Attack", class: "ddos", color: "#ff9900" },
+            { name: "Malware Injection", class: "malware", color: "#ff3333" },
+            { name: "Phishing Vector", class: "phishing", color: "#00ccff" },
+            { name: "Ransomware Payload", class: "malware", color: "#ff3333" }
+        ];
+
+        let activeAttacks = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Helper to convert normalized coordinates to actual pixels
+        function getXY(target) {
+            return {
+                x: (target.x / 100) * canvas.width,
+                y: (target.y / 100) * canvas.height
+            };
+        }
+
+        // Draw a simulated digital tech-grid world map
+        function drawWorldGrid() {
+            ctx.fillStyle = '#0a0a12';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw clean cyber map background grid
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.04)';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Draw target nodes
+            targets.forEach(target => {
+                const pos = getXY(target);
+                ctx.fillStyle = 'rgba(0, 255, 102, 0.4)';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(0, 255, 102, 0.15)';
+                ctx.font = '10px monospace';
+                ctx.fillText(target.name, pos.x + 8, pos.y + 3);
+            });
+        }
+
+        // Spawns a randomized simulated cyber attack
+        function triggerRandomAttack() {
+            const from = targets[Math.floor(Math.random() * targets.length)];
+            let to = targets[Math.floor(Math.random() * targets.length)];
+            while (to === from) { to = targets[Math.floor(Math.random() * targets.length)]; }
+
+            const type = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+            
+            activeAttacks.push({
+                from: getXY(from),
+                to: getXY(to),
+                type: type,
+                progress: 0,
+                speed: 0.015 + Math.random() * 0.02,
+                impactRadius: 0
+            });
+
+            // Log entry creation
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type.class}`;
+            const time = new Date().toLocaleTimeString().split(' ')[0];
+            entry.innerHTML = `[${time}] ${type.name}: ${from.name} -> ${to.name}`;
+            logPanel.appendChild(entry);
+            
+            // Keep log scrolled to bottom, trim older entries
+            if(logPanel.children.length > 8) logPanel.removeChild(logPanel.firstChild);
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+
+        // Animation Loop
+        function animate() {
+            drawWorldGrid();
+
+            for (let i = activeAttacks.length - 1; i >= 0; i--) {
+                let attack = activeAttacks[i];
+                
+                if (attack.progress < 1) {
+                    // Draw Bezier or curved beam from source to destination
+                    attack.progress += attack.speed;
+                    
+                    let currentX = attack.from.x + (attack.to.x - attack.from.x) * attack.progress;
+                    let currentY = attack.from.y + (attack.to.y - attack.from.y) * attack.progress;
+
+                    // Add a slight arc curve to the line
+                    let midX = (attack.from.x + attack.to.x) / 2;
+                    let midY = (attack.from.y + attack.to.y) / 2 - 50; // Arc apex
+                    
+                    // Quadratic Bezier interpolation point calculation
+                    let t = attack.progress;
+                    let arcX = (1 - t) * (1 - t) * attack.from.x + 2 * (1 - t) * t * midX + t * t * attack.to.x;
+                    let arcY = (1 - t) * (1 - t) * attack.from.y + 2 * (1 - t) * t * midY + t * t * attack.to.y;
+
+                    ctx.strokeStyle = attack.type.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(attack.from.x, attack.from.y);
+                    
+                    // Draw trail up to current progress position
+                    ctx.lineTo(arcX, arcY);
+                    ctx.stroke();
+
+                    // Lead tracer dot
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(arcX, arcY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // Destination Hit: Draw a fading explosion ring
+                    attack.impactRadius += 2;
+                    let alpha = 1 - (attack.impactRadius / 40);
+                    
+                    ctx.strokeStyle = attack.type.color;
+                    ctx.globalAlpha = Math.max(0, alpha);
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(attack.to.x, attack.to.y, attack.impactRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0; // Reset alpha
+
+                    if (alpha <= 0) {
+                        activeAttacks.splice(i, 1); // Clear finished attack
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Periodically drop simulated attacks
+        setInterval(triggerRandomAttack, 1400);
+        
+        // Fire up the animation matrix
+        animate();
+    </script>
+</body>
+</html>
