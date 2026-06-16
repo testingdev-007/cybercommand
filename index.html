@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Cyber Command Centre - High Fidelity</title>
+    <title>3D Cyber Command Centre</title>
     <style>
         :root {
             --primary: #00ff66;
@@ -23,6 +23,7 @@
             color: var(--primary);
         }
 
+        /* 3D WebGL Canvas Layer */
         #globeContainer {
             position: absolute;
             top: 0;
@@ -32,32 +33,7 @@
             z-index: 1;
         }
 
-        #threatLog {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 380px;
-            height: 220px;
-            background: var(--panel-bg);
-            border: 1px solid rgba(0, 255, 102, 0.2);
-            border-radius: 4px;
-            padding: 12px;
-            font-size: 11px;
-            overflow-y: hidden;
-            pointer-events: none;
-            z-index: 2;
-            box-shadow: 0 0 15px rgba(0, 255, 102, 0.05);
-        }
-
-        .log-entry {
-            margin-bottom: 5px;
-            white-space: nowrap;
-            animation: fadeIn 0.2s ease-out;
-        }
-        .log-entry.ddos { color: #ff9900; }
-        .log-entry.malware { color: #ff3333; }
-        .log-entry.phishing { color: #00ccff; }
-
+        /* Mission Control Panel */
         #controlPanel {
             position: absolute;
             top: 20px;
@@ -103,6 +79,34 @@
             box-shadow: 0 0 20px var(--alert);
         }
 
+        /* Interactive Threat Log Terminal */
+        #threatLog {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 380px;
+            height: 220px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 255, 102, 0.2);
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 11px;
+            overflow-y: hidden;
+            pointer-events: none;
+            z-index: 2;
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.05);
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            white-space: nowrap;
+            animation: fadeIn 0.2s ease-out;
+        }
+        .log-entry.ddos { color: #ff9900; }
+        .log-entry.malware { color: #ff3333; }
+        .log-entry.phishing { color: #00ccff; }
+
+        /* Full Screen Video Overlay Grid */
         #videoContainer {
             position: absolute;
             top: 0;
@@ -110,18 +114,10 @@
             width: 100%;
             height: 100%;
             z-index: 20;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0, 0, 0, 0.85);
             display: none;
             justify-content: center;
             align-items: center;
-        }
-
-        video {
-            max-width: 90%;
-            max-height: 85%;
-            border: 2px solid rgba(0, 255, 102, 0.4);
-            box-shadow: 0 0 30px rgba(0, 255, 102, 0.2);
-            background: #000;
         }
 
         @keyframes fadeIn {
@@ -141,26 +137,25 @@
     </div>
 
     <div id="videoContainer">
-        <video id="mainPlayer" controls muted playsinline></video>
-    </div>
+        </div>
 
     <script src="three.min.js"></script>
 
     <script>
         // ==========================================
-        // CONFIGURATION
+        // CONFIGURATION (Double check file case-sensitivity!)
         // ==========================================
         const VIDEO_CONFIG = {
-            startSequence: ["media/start1.mp4", "media/start2.mp4"],
-            finishVideo: "media/Cyber Scene 2.mp4"
+            startSequence: [
+                "./media/start1.mp4",
+                "./media/start2.mp4"
+            ],
+            finishVideo: "./media/finish.mp4"
         };
 
         const GLOBE_RADIUS = 60;
 
-        // ==========================================
-        // HIGH-FIDELITY GEOGRAPHY (Coarse Map Data Array)
-        // Accurate bounding boxes for highly recognizable shapes
-        // ==========================================
+        // Bounding zones for recognizable landmass geometry matrix lines
         const LANDMASSES = [
             { minLat: 10, maxLat: 70, minLon: -130, maxLon: -60 },  // North America
             { minLat: -55, maxLat: 12, minLon: -80, maxLon: -35 },  // South America
@@ -193,7 +188,7 @@
         ];
 
         // ==========================================
-        // 3D ENGINE INITIALIZATION
+        // 3D GLOBE ENGINE ENGINE (Three.js)
         // ==========================================
         const container = document.getElementById('globeContainer');
         let scene, camera, renderer, globeGroup;
@@ -214,12 +209,12 @@
             buildIdentifiableGlobe();
             createCityMarkers();
 
-            globeGroup.rotation.x = 0.4; // Tilt toward screen
+            globeGroup.rotation.x = 0.4; // Tilt globe screen forward
             
             window.addEventListener('resize', onWindowResize);
             animate();
 
-            // MULTIPLE ATTACKS ENGINE: Run independent loops for simultaneous attacks
+            // CONCURRENT MULTI-EVENT TIMERS
             setInterval(launchAttackArc, 600);  
             setInterval(launchAttackArc, 900);  
             setInterval(launchAttackArc, 1400); 
@@ -235,24 +230,20 @@
             );
         }
 
-        // Generates an instantly recognizable map mesh using dense matrix zones
         function buildIdentifiableGlobe() {
             const positions = [];
             const density = 25000; 
 
             for (let i = 0; i < density; i++) {
-                // Uniformly distribute coordinates across sphere surface
                 const phi = Math.acos((Math.random() * 2) - 1);
                 const theta = Math.random() * Math.PI * 2;
 
                 const lat = 90 - (phi * 180 / Math.PI);
                 const lon = (theta * 180 / Math.PI) - 180;
 
-                // Match against real-world bounding configurations
                 let insideLand = false;
                 for (const land of LANDMASSES) {
                     if (lat >= land.minLat && lat <= land.maxLat && lon >= land.minLon && lon <= land.maxLon) {
-                        // Noise filters to prevent blocky square borders and make coasts realistic
                         const noise = Math.sin(lat * 0.5) * Math.cos(lon * 0.5);
                         if (Math.random() > 0.15 || noise > -0.2) {
                             insideLand = true;
@@ -280,7 +271,6 @@
             const globePoints = new THREE.Points(geometry, material);
             globeGroup.add(globePoints);
 
-            // Tech Wireframe Sub-Layer
             const wireframeGeo = new THREE.SphereGeometry(GLOBE_RADIUS - 0.2, 30, 30);
             const wireframeMat = new THREE.MeshBasicMaterial({
                 color: 0x00ff66,
@@ -302,9 +292,6 @@
             });
         }
 
-        // ==========================================
-        // MULTI-STREAM ATTACK LOGIC
-        // ==========================================
         function launchAttackArc() {
             const fromCity = cities[Math.floor(Math.random() * cities.length)];
             let toCity = cities[Math.floor(Math.random() * cities.length)];
@@ -322,7 +309,6 @@
                 const p = new THREE.Vector3().lerpVectors(p1, p2, t);
                 p.normalize();
                 
-                // Parabolic arc height logic
                 const arcHeight = 15 * Math.sin(t * Math.PI);
                 p.multiplyScalar(GLOBE_RADIUS + arcHeight);
                 points.push(p);
@@ -338,7 +324,7 @@
             });
 
             const line = new THREE.Line(geo, mat);
-            line.geometry.setDrawRange(0, 0); // Hide initially, draw inside loop
+            line.geometry.setDrawRange(0, 0); 
             globeGroup.add(line);
 
             arcs.push({
@@ -347,7 +333,6 @@
                 speed: 0.015 + Math.random() * 0.02
             });
 
-            // Concurrent Terminal Logging Updates
             const logPanel = document.getElementById('threatLog');
             const entry = document.createElement('div');
             entry.className = `log-entry ${attack.class}`;
@@ -359,24 +344,18 @@
             logPanel.scrollTop = logPanel.scrollHeight;
         }
 
-        // ==========================================
-        // FRAME ANIMATION RENDER LOOP
-        // ==========================================
         function animate() {
             requestAnimationFrame(animate);
 
-            globeGroup.rotation.y += 0.0012; // Continuous base spin
+            globeGroup.rotation.y += 0.0012; 
 
-            // Cycle and update all concurrent line arrays dynamically
             for (let i = arcs.length - 1; i >= 0; i--) {
                 let arc = arcs[i];
                 arc.progress += arc.speed;
                 
-                // Draw the line segment moving forward across frame values
                 const totalLineSegments = 60;
                 arc.line.geometry.setDrawRange(0, Math.floor(arc.progress * totalLineSegments));
 
-                // Fade out trail near execution termination
                 if (arc.progress > 0.7) {
                     arc.line.material.opacity = (1 - arc.progress) * 3.3;
                 }
@@ -400,11 +379,12 @@
 
         window.onload = init3D;
 
+
         // ==========================================
-        // MISSION VIDEO LAYER PIPELINES
+        // PRISTINE SAFARI & GITHUB PAGES PLAYER ENGINE
         // ==========================================
         const videoContainer = document.getElementById('videoContainer');
-        const videoPlayer = document.getElementById('mainPlayer');
+        let videoPlayer = null; 
         const btnStart = document.getElementById('btnStart');
         const btnFinish = document.getElementById('btnFinish');
         
@@ -412,15 +392,65 @@
         let isPlayingSequence = false;
 
         function playVideo(src) {
+            // 1. Purge the existing DOM video node completely to drop Safari cache pipelines
+            if (videoPlayer) {
+                videoPlayer.pause();
+                videoPlayer.src = "";
+                videoPlayer.load();
+                videoPlayer.remove();
+            }
+
+            // 2. Spawn a pristine node container with strict Webkit streaming parameters
+            videoPlayer = document.createElement('video');
+            videoPlayer.id = 'mainPlayer';
+            
+            videoPlayer.setAttribute('controls', 'true');
+            videoPlayer.setAttribute('muted', 'true'); 
+            videoPlayer.setAttribute('playsinline', 'true'); // Required for iOS/macOS layout stability
+            videoPlayer.setAttribute('preload', 'auto');
+            
+            videoPlayer.style.maxWidth = '90%';
+            videoPlayer.style.maxHeight = '85%';
+            videoPlayer.style.border = '2px solid rgba(0, 255, 102, 0.4)';
+            videoPlayer.style.boxShadow = '0 0 30px rgba(0, 255, 102, 0.2)';
+            videoPlayer.style.background = '#000';
+
+            videoContainer.appendChild(videoPlayer);
+
+            // 3. Bind tracking parameters to the fresh instance
+            videoPlayer.addEventListener('ended', () => {
+                if (isPlayingSequence) {
+                    currentSequenceIndex++;
+                    if (currentSequenceIndex < VIDEO_CONFIG.startSequence.length) {
+                        playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
+                    } else {
+                        closeVideoPlayer();
+                    }
+                } else {
+                    closeVideoPlayer();
+                }
+            });
+
+            // 4. Inject structural URL coordinates and load tracking sequence
             videoPlayer.src = src;
             videoContainer.style.display = 'flex';
-            videoPlayer.play().catch(err => console.log("Media stream interrupted.", err));
+            
+            videoPlayer.load(); 
+            
+            const playPromise = videoPlayer.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.log("Safari sandboxed stream handled. User click bypass ready.", err);
+                });
+            }
         }
 
         function closeVideoPlayer() {
             videoContainer.style.display = 'none';
-            videoPlayer.pause();
-            videoPlayer.src = "";
+            if (videoPlayer) {
+                videoPlayer.pause();
+                videoPlayer.src = "";
+            }
             isPlayingSequence = false;
         }
 
@@ -434,19 +464,6 @@
         btnFinish.addEventListener('click', () => {
             isPlayingSequence = false; 
             playVideo(VIDEO_CONFIG.finishVideo);
-        });
-
-        videoPlayer.addEventListener('ended', () => {
-            if (isPlayingSequence) {
-                currentSequenceIndex++;
-                if (currentSequenceIndex < VIDEO_CONFIG.startSequence.length) {
-                    playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
-                } else {
-                    closeVideoPlayer();
-                }
-            } else {
-                closeVideoPlayer();
-            }
         });
 
         videoContainer.addEventListener('click', (e) => {
