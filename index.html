@@ -106,7 +106,7 @@
         .log-entry.malware { color: #ff3333; }
         .log-entry.phishing { color: #00ccff; }
 
-        /* Full Screen Video Overlay Grid */
+        /* Full Screen Video Overlay Frame */
         #videoContainer {
             position: absolute;
             top: 0;
@@ -118,6 +118,24 @@
             display: none;
             justify-content: center;
             align-items: center;
+        }
+
+        /* Dynamic Canvas Screen context layout container */
+        #videoScreenCanvas {
+            max-width: 90%;
+            max-height: 85%;
+            border: 2px solid rgba(0, 255, 102, 0.4);
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.2);
+            background: #000;
+        }
+
+        /* Hide the native element entirely to skip Safari Sandbox verification flags */
+        #hiddenSafariPlayer {
+            display: none;
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
         }
 
         @keyframes fadeIn {
@@ -137,23 +155,23 @@
     </div>
 
     <div id="videoContainer">
-        </div>
+        <canvas id="videoScreenCanvas"></canvas>
+    </div>
+
+    <video id="hiddenSafariPlayer" muted playsinline preload="auto"></video>
 
     <script src="three.min.js"></script>
 
     <script>
         // ==========================================
-        // DYNAMIC PATH SOLVER (Cures Safari/GitHub Pages Redirection)
+        // DYNAMIC ABSOLUTE RESOLVER
         // ==========================================
         function getAbsoluteUrl(relativeVideoPath) {
-            // Extracts current URL structure (e.g., https://user.github.io/repo/)
             let base = window.location.href.split('#')[0].split('?')[0];
             if (base.endsWith('.html')) {
                 base = base.substring(0, base.lastIndexOf('/'));
             }
             if (!base.endsWith('/')) base += '/';
-            
-            // Clean paths removing leading dots/slashes
             let cleanRelative = relativeVideoPath.replace(/^\.\//, "").replace(/^\//, "");
             return base + cleanRelative;
         }
@@ -161,23 +179,22 @@
         const VIDEO_CONFIG = {
             startSequence: [
                 getAbsoluteUrl("media/start1.mp4"),
-                getAbsoluteUrl("media/Cyber Scene 2.mp4")
+                getAbsoluteUrl("media/Cyber Session 2.mp4")
             ],
             finishVideo: getAbsoluteUrl("media/finish.mp4")
         };
 
         const GLOBE_RADIUS = 60;
 
-        // Bounding zones for recognizable landmass geometry matrix lines
         const LANDMASSES = [
-            { minLat: 10, maxLat: 70, minLon: -130, maxLon: -60 },  // North America
-            { minLat: -55, maxLat: 12, minLon: -80, maxLon: -35 },  // South America
-            { minLat: 35, maxLat: 70, minLon: -10, maxLon: 40 },    // Europe
-            { minLat: -35, maxLat: 35, minLon: -15, maxLon: 50 },   // Africa
-            { minLat: 10, maxLat: 75, minLon: 40, maxLon: 145 },   // Asia
-            { minLat: -40, maxLat: -10, minLon: 113, maxLon: 153 }, // Australia
-            { minLat: 5, maxLat: 25, minLon: 95, maxLon: 140 },     // SE Asia / Islands
-            { minLat: 60, maxLat: 83, minLon: -70, maxLon: -20 }    // Greenland
+            { minLat: 10, maxLat: 70, minLon: -130, maxLon: -60 },
+            { minLat: -55, maxLat: 12, minLon: -80, maxLon: -35 },
+            { minLat: 35, maxLat: 70, minLon: -10, maxLon: 40 },
+            { minLat: -35, maxLat: 35, minLon: -15, maxLon: 50 },
+            { minLat: 10, maxLat: 75, minLon: 40, maxLon: 145 },
+            { minLat: -40, maxLat: -10, minLon: 113, maxLon: 153 },
+            { minLat: 5, maxLat: 25, minLon: 95, maxLon: 140 },
+            { minLat: 60, maxLat: 83, minLon: -70, maxLon: -20 }
         ];
 
         const cities = [
@@ -201,7 +218,7 @@
         ];
 
         // ==========================================
-        // 3D GLOBE ENGINE ENGINE (Three.js)
+        // 3D GLOBE ENGINE (Three.js)
         // ==========================================
         const container = document.getElementById('globeContainer');
         let scene, camera, renderer, globeGroup;
@@ -227,7 +244,6 @@
             window.addEventListener('resize', onWindowResize);
             animate();
 
-            // CONCURRENT MULTI-EVENT TIMERS
             setInterval(launchAttackArc, 600);  
             setInterval(launchAttackArc, 900);  
             setInterval(launchAttackArc, 1400); 
@@ -321,7 +337,6 @@
                 const t = i / numPoints;
                 const p = new THREE.Vector3().lerpVectors(p1, p2, t);
                 p.normalize();
-                
                 const arcHeight = 15 * Math.sin(t * Math.PI);
                 p.multiplyScalar(GLOBE_RADIUS + arcHeight);
                 points.push(p);
@@ -357,15 +372,29 @@
             logPanel.scrollTop = logPanel.scrollHeight;
         }
 
+        // ==========================================
+        // MAIN RENDERING ENGINE (Includes Canvas Video Mirroring)
+        // ==========================================
+        const displayCanvas = document.getElementById('videoScreenCanvas');
+        const displayCtx = displayCanvas.getContext('2d');
+        const hiddenVideo = document.getElementById('hiddenSafariPlayer');
+        let canvasMirrorLoop = null;
+
+        function renderVideoToCanvas() {
+            if (!hiddenVideo.paused && !hiddenVideo.ended) {
+                // Instantly scale and stamp video timeline frames straight onto the layout canvas
+                displayCtx.drawImage(hiddenVideo, 0, 0, displayCanvas.width, displayCanvas.height);
+                canvasMirrorLoop = requestAnimationFrame(renderVideoToCanvas);
+            }
+        }
+
         function animate() {
             requestAnimationFrame(animate);
-
             globeGroup.rotation.y += 0.0012; 
 
             for (let i = arcs.length - 1; i >= 0; i--) {
                 let arc = arcs[i];
                 arc.progress += arc.speed;
-                
                 const totalLineSegments = 60;
                 arc.line.geometry.setDrawRange(0, Math.floor(arc.progress * totalLineSegments));
 
@@ -380,7 +409,6 @@
                     arcs.splice(i, 1);
                 }
             }
-
             renderer.render(scene, camera);
         }
 
@@ -394,88 +422,77 @@
 
 
         // ==========================================
-        // OVERHAULED VIDEO ENGINE (Forced Absolute Assets)
+        // MISSION PIPELINE BINDINGS
         // ==========================================
         const videoContainer = document.getElementById('videoContainer');
-        let videoPlayer = null; 
         const btnStart = document.getElementById('btnStart');
         const btnFinish = document.getElementById('btnFinish');
         
         let currentSequenceIndex = 0;
         let isPlayingSequence = false;
 
-        function playVideo(src) {
-            console.log("Safari requesting pipeline absolute address:", src);
+        // Listen for metadata resolution to correctly map dimensions
+        hiddenVideo.addEventListener('loadedmetadata', () => {
+            displayCanvas.width = hiddenVideo.videoWidth || 640;
+            displayCanvas.height = hiddenVideo.videoHeight || 360;
+        });
 
-            if (videoPlayer) {
-                videoPlayer.pause();
-                videoPlayer.src = "";
-                videoPlayer.load();
-                videoPlayer.remove();
-            }
+        hiddenVideo.addEventListener('play', () => {
+            cancelAnimationFrame(canvasMirrorLoop);
+            renderVideoToCanvas();
+        });
 
-            videoPlayer = document.createElement('video');
-            videoPlayer.id = 'mainPlayer';
-            
-            videoPlayer.setAttribute('controls', 'true');
-            videoPlayer.setAttribute('muted', 'true'); 
-            videoPlayer.setAttribute('playsinline', 'true'); 
-            videoPlayer.setAttribute('preload', 'auto');
-            
-            videoPlayer.style.maxWidth = '90%';
-            videoPlayer.style.maxHeight = '85%';
-            videoPlayer.style.border = '2px solid rgba(0, 255, 102, 0.4)';
-            videoPlayer.style.boxShadow = '0 0 30px rgba(0, 255, 102, 0.2)';
-            videoPlayer.style.background = '#000';
-
-            videoContainer.appendChild(videoPlayer);
-
-            videoPlayer.addEventListener('ended', () => {
-                if (isPlayingSequence) {
-                    currentSequenceIndex++;
-                    if (currentSequenceIndex < VIDEO_CONFIG.startSequence.length) {
-                        playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
-                    } else {
-                        closeVideoPlayer();
-                    }
+        hiddenVideo.addEventListener('ended', () => {
+            cancelAnimationFrame(canvasMirrorLoop);
+            if (isPlayingSequence) {
+                currentSequenceIndex++;
+                if (currentSequenceIndex < VIDEO_CONFIG.startSequence.length) {
+                    executeStream(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
                 } else {
                     closeVideoPlayer();
                 }
-            });
+            } else {
+                closeVideoPlayer();
+            }
+        });
 
-            // Set source explicitly
-            videoPlayer.src = src;
+        function executeStream(src) {
+            console.log("Canvas Mirror Stream loading:", src);
+            
+            // Set safety cross-origin rules to force Safari to accept the fetch handshake
+            hiddenVideo.setAttribute('crossOrigin', 'anonymous');
+            hiddenVideo.src = src;
+            
             videoContainer.style.display = 'flex';
+            hiddenVideo.load();
             
-            videoPlayer.load(); 
-            
-            const playPromise = videoPlayer.play();
+            const playPromise = hiddenVideo.play();
             if (playPromise !== undefined) {
                 playPromise.catch(err => {
-                    console.log("Safari pipeline blocked by engine rules. Awaiting manual override click.", err);
+                    console.log("Canvas Engine safely handling user gesture restrictions.", err);
                 });
             }
         }
 
         function closeVideoPlayer() {
             videoContainer.style.display = 'none';
-            if (videoPlayer) {
-                videoPlayer.pause();
-                videoPlayer.src = "";
-            }
+            hiddenVideo.pause();
+            hiddenVideo.src = "";
             isPlayingSequence = false;
+            cancelAnimationFrame(canvasMirrorLoop);
+            displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
         }
 
         btnStart.addEventListener('click', () => {
             if (VIDEO_CONFIG.startSequence.length === 0) return;
             isPlayingSequence = true;
             currentSequenceIndex = 0;
-            playVideo(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
+            executeStream(VIDEO_CONFIG.startSequence[currentSequenceIndex]);
         });
 
         btnFinish.addEventListener('click', () => {
             isPlayingSequence = false; 
-            playVideo(VIDEO_CONFIG.finishVideo);
+            executeStream(VIDEO_CONFIG.finishVideo);
         });
 
         videoContainer.addEventListener('click', (e) => {
