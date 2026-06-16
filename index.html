@@ -143,14 +143,27 @@
 
     <script>
         // ==========================================
-        // CONFIGURATION (Double check file case-sensitivity!)
+        // DYNAMIC PATH SOLVER (Cures Safari/GitHub Pages Redirection)
         // ==========================================
+        function getAbsoluteUrl(relativeVideoPath) {
+            // Extracts current URL structure (e.g., https://user.github.io/repo/)
+            let base = window.location.href.split('#')[0].split('?')[0];
+            if (base.endsWith('.html')) {
+                base = base.substring(0, base.lastIndexOf('/'));
+            }
+            if (!base.endsWith('/')) base += '/';
+            
+            // Clean paths removing leading dots/slashes
+            let cleanRelative = relativeVideoPath.replace(/^\.\//, "").replace(/^\//, "");
+            return base + cleanRelative;
+        }
+
         const VIDEO_CONFIG = {
             startSequence: [
-                "./media/start1.mp4",
-                "./media/Cyber Scene 2.mp4"
+                getAbsoluteUrl("media/start1.mp4"),
+                getAbsoluteUrl("media/Cyber Scene 2.mp4")
             ],
-            finishVideo: "./media/finish.mp4"
+            finishVideo: getAbsoluteUrl("media/finish.mp4")
         };
 
         const GLOBE_RADIUS = 60;
@@ -209,7 +222,7 @@
             buildIdentifiableGlobe();
             createCityMarkers();
 
-            globeGroup.rotation.x = 0.4; // Tilt globe screen forward
+            globeGroup.rotation.x = 0.4; 
             
             window.addEventListener('resize', onWindowResize);
             animate();
@@ -381,7 +394,7 @@
 
 
         // ==========================================
-        // PRISTINE SAFARI & GITHUB PAGES PLAYER ENGINE
+        // OVERHAULED VIDEO ENGINE (Forced Absolute Assets)
         // ==========================================
         const videoContainer = document.getElementById('videoContainer');
         let videoPlayer = null; 
@@ -392,7 +405,8 @@
         let isPlayingSequence = false;
 
         function playVideo(src) {
-            // 1. Purge the existing DOM video node completely to drop Safari cache pipelines
+            console.log("Safari requesting pipeline absolute address:", src);
+
             if (videoPlayer) {
                 videoPlayer.pause();
                 videoPlayer.src = "";
@@ -400,13 +414,12 @@
                 videoPlayer.remove();
             }
 
-            // 2. Spawn a pristine node container with strict Webkit streaming parameters
             videoPlayer = document.createElement('video');
             videoPlayer.id = 'mainPlayer';
             
             videoPlayer.setAttribute('controls', 'true');
             videoPlayer.setAttribute('muted', 'true'); 
-            videoPlayer.setAttribute('playsinline', 'true'); // Required for iOS/macOS layout stability
+            videoPlayer.setAttribute('playsinline', 'true'); 
             videoPlayer.setAttribute('preload', 'auto');
             
             videoPlayer.style.maxWidth = '90%';
@@ -417,7 +430,6 @@
 
             videoContainer.appendChild(videoPlayer);
 
-            // 3. Bind tracking parameters to the fresh instance
             videoPlayer.addEventListener('ended', () => {
                 if (isPlayingSequence) {
                     currentSequenceIndex++;
@@ -431,7 +443,7 @@
                 }
             });
 
-            // 4. Inject structural URL coordinates and load tracking sequence
+            // Set source explicitly
             videoPlayer.src = src;
             videoContainer.style.display = 'flex';
             
@@ -440,7 +452,7 @@
             const playPromise = videoPlayer.play();
             if (playPromise !== undefined) {
                 playPromise.catch(err => {
-                    console.log("Safari sandboxed stream handled. User click bypass ready.", err);
+                    console.log("Safari pipeline blocked by engine rules. Awaiting manual override click.", err);
                 });
             }
         }
