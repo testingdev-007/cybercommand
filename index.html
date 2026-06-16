@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Cyber Command Centre</title>
+    <title>3D Cyber Command Centre - Audio Enabled</title>
     <style>
         :root {
             --primary: #00ff66;
@@ -120,7 +120,6 @@
             align-items: center;
         }
 
-        /* Dynamic Canvas Screen context layout container */
         #videoScreenCanvas {
             max-width: 90%;
             max-height: 85%;
@@ -129,7 +128,6 @@
             background: #000;
         }
 
-        /* Hide the native element entirely to skip Safari Sandbox verification flags */
         #hiddenSafariPlayer {
             display: none;
             position: absolute;
@@ -158,13 +156,13 @@
         <canvas id="videoScreenCanvas"></canvas>
     </div>
 
-    <video id="hiddenSafariPlayer" muted playsinline preload="auto"></video>
+    <video id="hiddenSafariPlayer" playsinline preload="auto"></video>
 
     <script src="three.min.js"></script>
 
     <script>
         // ==========================================
-        // DYNAMIC ABSOLUTE RESOLVER
+        // PATH RESOLVER
         // ==========================================
         function getAbsoluteUrl(relativeVideoPath) {
             let base = window.location.href.split('#')[0].split('?')[0];
@@ -179,7 +177,7 @@
         const VIDEO_CONFIG = {
             startSequence: [
                 getAbsoluteUrl("media/start1.mp4"),
-                getAbsoluteUrl("media/Cyber Session 2.mp4")
+                getAbsoluteUrl("media/start2.mp4")
             ],
             finishVideo: getAbsoluteUrl("media/finish.mp4")
         };
@@ -373,7 +371,7 @@
         }
 
         // ==========================================
-        // MAIN RENDERING ENGINE (Includes Canvas Video Mirroring)
+        // MAIN RENDERING ENGINE (Canvas Rendering Context)
         // ==========================================
         const displayCanvas = document.getElementById('videoScreenCanvas');
         const displayCtx = displayCanvas.getContext('2d');
@@ -382,7 +380,6 @@
 
         function renderVideoToCanvas() {
             if (!hiddenVideo.paused && !hiddenVideo.ended) {
-                // Instantly scale and stamp video timeline frames straight onto the layout canvas
                 displayCtx.drawImage(hiddenVideo, 0, 0, displayCanvas.width, displayCanvas.height);
                 canvasMirrorLoop = requestAnimationFrame(renderVideoToCanvas);
             }
@@ -422,6 +419,28 @@
 
 
         // ==========================================
+        // WEB AUDIO API ROUTER (Bypasses Safari Mute Restrictions)
+        // ==========================================
+        let audioCtx = null;
+        let audioSourceNode = null;
+
+        function setupWebAudioPipeline() {
+            // Only instantiate once on first user button gesture interaction
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Route hidden video element audio directly into the web audio engine graph
+                audioSourceNode = audioCtx.createMediaElementSource(hiddenVideo);
+                audioSourceNode.connect(audioCtx.destination);
+            }
+            
+            // Safari web audio graph context guard
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ==========================================
         // MISSION PIPELINE BINDINGS
         // ==========================================
         const videoContainer = document.getElementById('videoContainer');
@@ -431,7 +450,6 @@
         let currentSequenceIndex = 0;
         let isPlayingSequence = false;
 
-        // Listen for metadata resolution to correctly map dimensions
         hiddenVideo.addEventListener('loadedmetadata', () => {
             displayCanvas.width = hiddenVideo.videoWidth || 640;
             displayCanvas.height = hiddenVideo.videoHeight || 360;
@@ -457,9 +475,14 @@
         });
 
         function executeStream(src) {
-            console.log("Canvas Mirror Stream loading:", src);
+            console.log("Canvas Engine pushing source payload:", src);
             
-            // Set safety cross-origin rules to force Safari to accept the fetch handshake
+            // Re-verify sound routing is unblocked by hardware gesture
+            setupWebAudioPipeline();
+
+            // Explicitly do NOT set hiddenVideo.muted = true anymore. 
+            // Web Audio handles the handshake so the browser doesn't throw a sandboxed block error.
+            hiddenVideo.removeAttribute('muted');
             hiddenVideo.setAttribute('crossOrigin', 'anonymous');
             hiddenVideo.src = src;
             
@@ -469,7 +492,7 @@
             const playPromise = hiddenVideo.play();
             if (playPromise !== undefined) {
                 playPromise.catch(err => {
-                    console.log("Canvas Engine safely handling user gesture restrictions.", err);
+                    console.log("Audio pipeline requires an explicit click track gesture response.", err);
                 });
             }
         }
